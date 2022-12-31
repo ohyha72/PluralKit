@@ -67,6 +67,12 @@ public static class DiscordCacheExtensions
 
     private static async ValueTask SaveGuildCreate(this IDiscordCache cache, GuildCreateEvent guildCreate)
     {
+        if (cache is RedisDiscordCache)
+        {
+            await ((RedisDiscordCache)cache).SaveGuildCreateRedis(guildCreate);
+            return;
+        }
+
         await cache.SaveGuild(guildCreate);
 
         foreach (var channel in guildCreate.Channels)

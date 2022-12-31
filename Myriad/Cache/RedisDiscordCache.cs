@@ -5,6 +5,7 @@ using StackExchange.Redis.KeyspaceIsolation;
 
 using Serilog;
 
+using Myriad.Gateway;
 using Myriad.Types;
 
 namespace Myriad.Cache;
@@ -29,6 +30,41 @@ public class RedisDiscordCache: IDiscordCache
 
     private IDatabase db => _redis.GetDatabase().WithKeyPrefix("discord:cache:");
 
+    public async ValueTask SaveGuildCreateRedis(GuildCreateEvent evt)
+    {
+        // we got a guild create, clear existing guild info
+        await db.KeyDeleteAsync($"guild_channels:{evt.Id}");
+        await db.KeyDeleteAsync($"guild_roles:{evt.Id}");
+
+        await SaveGuild(evt);
+
+        await db.HashSetAsync("channels", evt.Channels.Select(
+            channel => new HashEntry(channel.Id, (channel with { GuildId = evt.Id }).ToProtobuf().ToByteArray())
+        ).ToArray());
+        await db.HashSetAsync(
+            $"guild_channels:{evt.Id}",
+            evt.Channels.Select(channel => new HashEntry(channel.Id, true)).ToArray()
+        );
+
+        await db.HashSetAsync("channels", evt.Threads.Select(
+            channel => new HashEntry(channel.Id, (channel with { GuildId = evt.Id }).ToProtobuf().ToByteArray())
+        ).ToArray());
+        await db.HashSetAsync(
+            $"guild_channels:{evt.Id}",
+            evt.Threads.Select(thread => new HashEntry(thread.Id, true)).ToArray()
+        );
+
+        await db.HashSetAsync(
+            "roles",
+            evt.Roles.Select(role => new HashEntry(role.Id, role.ToProtobuf().ToByteArray())).ToArray()
+        );
+        await db.HashSetAsync(
+            $"guild_roles:{evt.Id}",
+            evt.Roles.Select(role => new HashEntry(role.Id, true)).ToArray()
+        );
+    }
+
+    // not called from global guild create handler
     public async ValueTask SaveGuild(Guild guild)
     {
         _logger.Verbose("Saving guild {GuildId} to redis", guild.Id);
@@ -40,9 +76,6 @@ public class RedisDiscordCache: IDiscordCache
         g.PremiumTier = (int)guild.PremiumTier;
 
         await db.HashSetProtobufAsync("guilds", guild.Id, g);
-
-        foreach (var role in guild.Roles)
-            await SaveRole(guild.Id, role);
     }
 
     public async ValueTask SaveChannel(Channel channel)
@@ -92,14 +125,7 @@ public class RedisDiscordCache: IDiscordCache
     {
         _logger.Verbose("Saving role {RoleId} in {GuildId} to redis", role.Id, guildId);
 
-        await db.HashSetProtobufAsync("roles", role.Id, new CachedRole()
-        {
-            Id = role.Id,
-            Mentionable = role.Mentionable,
-            Name = role.Name,
-            Permissions = (ulong)role.Permissions,
-            Position = role.Position,
-        });
+        await db.HashSetProtobufAsync("roles", role.Id, role.ToProtobuf());
 
         await db.HashSetAsync($"guild_roles:{guildId}", role.Id, true);
     }
@@ -293,6 +319,16 @@ internal static class CacheProtoExt
             Discriminator = user.Discriminator,
             Avatar = user.HasAvatar ? user.Avatar : null,
             Bot = user.Bot,
+        };
+
+    public static CachedRole ToProtobuf(this Myriad.Types.Role role)
+        => new CachedRole()
+        {
+            Id = role.Id,
+            Mentionable = role.Mentionable,
+            Name = role.Name,
+            Permissions = (ulong)role.Permissions,
+            Position = role.Position,
         };
 }
 
