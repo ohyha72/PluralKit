@@ -29,7 +29,4 @@ jobs:
           file: services/gateway_worker/Dockerfile
           push: true
           tags: |
-            ghcr.io/pluralkit/gateway:${{ env.BRANCH_NAME }}
             ghcr.io/pluralkit/gateway:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/pluralkit/gateway:${{ env.BRANCH_NAME }}
-          cache-to: type=inline
