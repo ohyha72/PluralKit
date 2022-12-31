@@ -57,7 +57,7 @@ public class Init
 
             var cache = services.Resolve<IDiscordCache>();
             if (cache is RedisDiscordCache)
-                await (cache as RedisDiscordCache).InitAsync(coreConfig.RedisAddr);
+                await (cache as RedisDiscordCache).InitAsync(config.RedisGatewayUrl);
 
             logger.Information("Initializing services");
             var worker = services.Resolve<WorkerMainService>();

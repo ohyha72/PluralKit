@@ -27,7 +27,7 @@ public class RedisDiscordCache: IDiscordCache
         _redis = await ConnectionMultiplexer.ConnectAsync(addr);
     }
 
-    private IDatabase db => _redis.GetDatabase().WithKeyPrefix("discord:");
+    private IDatabase db => _redis.GetDatabase().WithKeyPrefix("discord:cache:");
 
     public async ValueTask SaveGuild(Guild guild)
     {
@@ -39,40 +39,21 @@ public class RedisDiscordCache: IDiscordCache
         g.OwnerId = guild.OwnerId;
         g.PremiumTier = (int)guild.PremiumTier;
 
-        var tr = db.CreateTransaction();
-
-        tr.HashSetAsync("guilds", guild.Id.HashWrapper(g));
+        await db.HashSetProtobufAsync("guilds", guild.Id, g);
 
         foreach (var role in guild.Roles)
-        {
-            // Don't call SaveRole because that updates guild state
-            // and we just got a brand new one :)
-            // actually with redis it doesn't update guild state, but we're still doing it here because transaction
-            tr.HashSetAsync("roles", role.Id.HashWrapper(new CachedRole()
-            {
-                Id = role.Id,
-                Name = role.Name,
-                Position = role.Position,
-                Permissions = (ulong)role.Permissions,
-                Mentionable = role.Mentionable,
-            }));
-
-            tr.HashSetAsync($"guild_roles:{guild.Id}", role.Id, true, When.NotExists);
-        }
-
-        await tr.ExecuteAsync();
+            await SaveRole(guild.Id, role);
     }
 
     public async ValueTask SaveChannel(Channel channel)
     {
         _logger.Verbose("Saving channel {ChannelId} to redis", channel.Id);
 
-        await db.HashSetAsync("channels", channel.Id.HashWrapper(channel.ToProtobuf()));
+        await db.HashSetProtobufAsync("channels", channel.Id, channel.ToProtobuf());
 
         if (channel.GuildId != null)
-            await db.HashSetAsync($"guild_channels:{channel.GuildId.Value}", channel.Id, true, When.NotExists);
+            await db.HashSetAsync($"guild_channels:{channel.GuildId.Value}", channel.Id, true);
 
-        // todo: use a transaction for this?
         if (channel.Recipients != null)
             foreach (var recipient in channel.Recipients)
                 await SaveUser(recipient);
@@ -93,7 +74,7 @@ public class RedisDiscordCache: IDiscordCache
         if (user.Avatar != null)
             u.Avatar = user.Avatar;
 
-        await db.HashSetAsync("users", user.Id.HashWrapper(u));
+        await db.HashSetProtobufAsync("users", user.Id, u);
     }
 
     public async ValueTask SaveSelfMember(ulong guildId, GuildMemberPartial member)
@@ -104,23 +85,23 @@ public class RedisDiscordCache: IDiscordCache
         foreach (var role in member.Roles)
             gm.Roles.Add(role);
 
-        await db.HashSetAsync("members", guildId.HashWrapper(gm));
+        await db.HashSetProtobufAsync("members", guildId, gm);
     }
 
     public async ValueTask SaveRole(ulong guildId, Myriad.Types.Role role)
     {
         _logger.Verbose("Saving role {RoleId} in {GuildId} to redis", role.Id, guildId);
 
-        await db.HashSetAsync("roles", role.Id.HashWrapper(new CachedRole()
+        await db.HashSetProtobufAsync("roles", role.Id, new CachedRole()
         {
             Id = role.Id,
             Mentionable = role.Mentionable,
             Name = role.Name,
             Permissions = (ulong)role.Permissions,
             Position = role.Position,
-        }));
+        });
 
-        await db.HashSetAsync($"guild_roles:{guildId}", role.Id, true, When.NotExists);
+        await db.HashSetAsync($"guild_roles:{guildId}", role.Id, true);
     }
 
     public async ValueTask SaveDmChannelStub(ulong channelId)
@@ -128,12 +109,14 @@ public class RedisDiscordCache: IDiscordCache
         // Use existing channel object if present, otherwise add a stub
         // We may get a message create before channel create and we want to have it saved
 
+        // todo: we cache DM channels in postgres, this probably doesn't need to exist
+
         if (await TryGetChannel(channelId) == null)
-            await db.HashSetAsync("channels", channelId.HashWrapper(new CachedChannel()
+            await db.HashSetProtobufAsync("channels", channelId, new CachedChannel()
             {
                 Id = channelId,
                 Type = (int)Channel.ChannelType.Dm,
-            }));
+            });
     }
 
     public async ValueTask RemoveGuild(ulong guildId)
@@ -313,11 +296,12 @@ internal static class CacheProtoExt
         };
 }
 
-internal static class RedisExt
+public static class CacheRedisExt
 {
     // convenience method
-    public static HashEntry[] HashWrapper<T>(this ulong key, T value) where T : IMessage
-        => new[] { new HashEntry(key, value.ToByteArray()) };
+    // used to be HashWrapper with `this ulong key`, but that makes code readability really bad
+    public static Task HashSetProtobufAsync<T>(this IDatabase db, string hash, ulong key, T value) where T : IMessage
+        => db.HashSetAsync(hash, new[] { new HashEntry(key, value.ToByteArray()) });
 }
 
 public static class ProtobufExt
