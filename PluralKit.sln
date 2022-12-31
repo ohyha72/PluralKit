@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluralKit.Core", "PluralKit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluralKit.API", "PluralKit.API\PluralKit.API.csproj", "{3420F8A9-125C-4F7F-A444-10DD16945754}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GatewayWorker", "services/gateway_worker/GatewayWorker.csproj", "{ACB9BF37-F29C-4068-A7D1-2EFF3C308C4B}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluralKit.Tests", "PluralKit.Tests\PluralKit.Tests.csproj", "{752FE725-5EE1-45E9-B721-0CDD28171AC8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Myriad", "Myriad\Myriad.csproj", "{ACB9BF37-F29C-4068-A7D1-2EFF2C308C4B}"

@@ -13,6 +13,7 @@
 !scripts/run-clustered.sh
 !dashboard
 !scheduled_tasks
+!services
 
 # Re-exclude host build artifact directories
 **/bin

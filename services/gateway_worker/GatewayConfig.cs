@@ -1,6 +1,6 @@
-namespace PluralKit.Bot;
+namespace GatewayWorker;
 
-public class BotConfig
+public class GatewayWorkerConfig
 {
     public static readonly string[] DefaultPrefixes = { "pk;", "pk!" };
 
@@ -14,23 +14,13 @@ public class BotConfig
 
     public int? MaxShardConcurrency { get; set; }
 
-    public ulong? AdminRole { get; set; }
-
     public ClusterSettings? Cluster { get; set; }
-
-    public string? GatewayQueueUrl { get; set; }
-    public bool UseRedisRatelimiter { get; set; } = false;
-    public bool UseRedisCache { get; set; } = false;
-
-    public string? RedisGatewayUrl { get; set; }
-    public string[] RedisGatewayTopics { get; set; } = { };
 
     public string? DiscordBaseUrl { get; set; }
 
-    public bool DisableErrorReporting { get; set; } = false;
+    public string? RedisGatewayUrl { get; set; }
 
-    public bool IsBetaBot { get; set; } = false!;
-    public string BetaBotAPIUrl { get; set; }
+    public bool UseRedisCache { get; set; } = false;
 
     public record ClusterSettings
     {

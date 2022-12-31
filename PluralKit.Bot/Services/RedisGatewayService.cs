@@ -23,26 +23,45 @@ public class RedisGatewayService
         _logger = logger.ForContext<RedisGatewayService>();
     }
 
+    private List<Task> _workers = new();
+
     public event Func<(int, IGatewayEvent), Task>? OnEventReceived;
 
-    public async Task Start(int shardId)
+    public async Task Start()
     {
         if (_redis == null)
             _redis = await ConnectionMultiplexer.ConnectAsync(_config.RedisGatewayUrl);
 
-        _logger.Debug("Subscribing to shard {ShardId} on redis", shardId);
-
-        var channel = await _redis.GetSubscriber().SubscribeAsync($"evt-{shardId}");
-        channel.OnMessage((evt) => Handle(shardId, evt));
+        foreach (var topic in _config.RedisGatewayTopics)
+        {
+            var redisKey = $"discord:evt:{topic}";
+            _logger.Debug("Listening to redis on {redisTopic}", redisKey);
+            _workers.Add(RedisLoop(redisKey));
+        }
     }
 
-    public async Task Handle(int shardId, ChannelMessage message)
+    public async Task RedisLoop(string topic)
     {
-        var packet = JsonSerializer.Deserialize<GatewayPacket>(message.Message, _jsonSerializerOptions);
-        if (packet.Opcode != GatewayOpcode.Dispatch) return;
-        var evt = DeserializeEvent(packet.EventType, (JsonElement)packet.Payload);
-        if (evt == null) return;
-        await OnEventReceived((shardId, evt));
+        while (true)
+        {
+            // this is a mess
+            // todo: ignore events that are "too old"
+            try
+            {
+                var res = await _redis.GetDatabase().ExecuteAsync("blpop", new object[] { topic, 1 });
+                if (res.ToString() == "(nil)") continue; // this sucks
+                var message = ((RedisValue[])res)[1];
+                _logger.Verbose("got event from Redis: {evt}", message);
+                var packet = JsonSerializer.Deserialize<GatewayPacket>((string)message, _jsonSerializerOptions);
+                var evt = DeserializeEvent(packet.EventType, (JsonElement)packet.Payload);
+                if (evt == null) return;
+                await OnEventReceived((packet.Sequence!.Value, evt));
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Error in redis loop:");
+            }
+        }
     }
 
     private IGatewayEvent? DeserializeEvent(string eventType, JsonElement payload)
