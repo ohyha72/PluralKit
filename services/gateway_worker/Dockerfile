@@ -7,6 +7,7 @@ COPY proto/ /app/proto
 
 COPY services/gateway_worker/ /app/services/gateway_worker
 COPY Myriad/ /app/Myriad
+COPY PluralKit.Bot/ /app/PluralKit.Bot
 COPY PluralKit.Core/ /app/PluralKit.Core
 
 RUN dotnet build services/gateway_worker -c Release -o bin

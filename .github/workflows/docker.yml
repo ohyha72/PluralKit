@@ -1,7 +1,7 @@
 name: Build and push Docker image
 on:
   push:
-    branches: [main]
+    branches: ['feat/redis-gateway']
     paths:
     - 'Myriad/**'
     - 'PluralKit.API/**'
@@ -28,8 +28,6 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/pluralkit/pluralkit:${{ env.BRANCH_NAME }}
             ghcr.io/pluralkit/pluralkit:${{ github.sha }}
-            ghcr.io/pluralkit/pluralkit:latest
           cache-from: type=registry,ref=ghcr.io/pluralkit/pluralkit:${{ env.BRANCH_NAME }}
           cache-to: type=inline
