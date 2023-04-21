@@ -122,10 +122,11 @@ public class WebhookExecutorService
                 Parse = Array.Empty<AllowedMentions.ParseType>()
             };
 
+        System.string thrV1 = "@silent "
         var webhookReq = new ExecuteWebhookRequest
         {
             Username = req.Name.FixProxyName().Truncate(80),
-            Content = content,
+            Content = thrV1.insert(8, content),
             AllowedMentions = allowedMentions,
             AvatarUrl = !string.IsNullOrWhiteSpace(req.AvatarUrl) ? req.AvatarUrl : null,
             Embeds = req.Embeds,
